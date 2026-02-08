@@ -1,5 +1,9 @@
 import random
+import numpy as np
 from enum import Enum
+from player import Player
+from point import Point
+import types
 
 class GameStates(Enum):
     SCORE00_00 = 1
@@ -22,27 +26,37 @@ class GameStates(Enum):
     SCORE40_AD = 18
 
 class Match:
-    sets = []
-    best_of = 3
-    player_one = "Player One"
-    player_two = "Player Two"
-    player_one_sets_won = 0
-    player_two_sets_won = 0
-    winner = None
-    current_game = 0
-    current_game_state = GameStates.SCORE00_00
-    current_set = 0
+    best_of = 5
 
     def __init__(self, player_one, player_two):
-        # Initialize players
+        # Initialize instance variables (not class variables)
+        self.sets = []
         self.player_one = player_one
         self.player_two = player_two
+        self.player_one_sets_won = 0
+        self.player_two_sets_won = 0
+        self.winner = None
+        self.current_game = 0
+        self.current_game_state = GameStates.SCORE00_00
+        self.current_set = 0
+        self.total_games_played = 0
+
+        self.server = random.choice([self.player_one, self.player_two])
 
         # Initialize first set and first game
         first_set = Set()
         first_game = Game()
         self.sets.append(first_set)
         self.sets[0].games.append(first_game)
+    
+    def toggle_server(self):
+        self.server = self.player_one if self.server == self.player_two else self.player_two
+    
+    def get_server_and_receiver(self):
+        if self.server == self.player_one:
+            return self.player_one, self.player_two
+        else:
+            return self.player_two, self.player_one
 
     def set_player_one(self, name: str):
         self.player_one = name
@@ -57,13 +71,17 @@ class Match:
         if name == self.player_one: self.winner = self.player_one
         if name == self.player_two: self.winner = self.player_two
 
-    def add_point(self, point: Point):
+    def add_point(self, point):
         self.sets[self.current_set].games[self.current_game].points.append(point)
         if self.sets[self.current_set].games[self.current_game].is_tiebreaker:
             if(point.winner == self.player_one):
                 self.sets[self.current_set].player_one_tiebreaker_points += 1
             else:
                 self.sets[self.current_set].player_two_tiebreaker_points += 1
+
+            if (self.sets[self.current_set].player_one_tiebreaker_points + self.sets[self.current_set].player_two_tiebreaker_points) % 2 == 1:
+                self.toggle_server()
+
             if self.sets[self.current_set].player_one_tiebreaker_points - self.sets[self.current_set].player_two_tiebreaker_points >= 2 and \
                self.sets[self.current_set].player_one_tiebreaker_points >= 7:
                 self.add_game(self.player_one)
@@ -172,6 +190,8 @@ class Match:
                         self.add_game(self.player_two)
     
     def add_game(self, player):
+        self.toggle_server()
+        self.total_games_played = self.total_games_played + 1
         cur_set = self.sets[self.current_set]
         if player == self.player_one:
             cur_set.score[0] += 1
@@ -221,46 +241,16 @@ class Match:
 
 
 class Set:
-    games = []
-    first_to = 6
-    is_win_by_2 = True
-    has_tiebreaker = True
-    score = [0, 0]
-
-    player_one_tiebreaker_points = 0
-    player_two_tiebreaker_points = 0
-
     def __init__(self):
         self.games = []
+        self.first_to = 6
+        self.is_win_by_2 = True
+        self.has_tiebreaker = True
         self.score = [0, 0]
+        self.player_one_tiebreaker_points = 0
+        self.player_two_tiebreaker_points = 0
 
 class Game:
-    points = []
-    is_tiebreaker = False
     def __init__(self, is_tiebreaker=False):
         self.points = []
         self.is_tiebreaker = is_tiebreaker
-
-class Point:
-    winner = None
-    def __init__(self, winner):
-        self.winner = winner    
-
-def play_point(match):
-    point = None
-    if random.random() < 0.5:
-        point = Point(match.player_one)
-    else:
-        point = Point(match.player_two)
-    
-    match.add_point(point)
-
-def main():
-    match = Match("Jannik Sinner", "Carlos Alcaraz")
-    while match.winner is None:
-        play_point(match)
-
-    match.print_score()
-
-if __name__ == "__main__":
-    main()
